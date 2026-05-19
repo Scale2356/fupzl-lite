@@ -783,6 +783,8 @@ async def _require_authenticated_login_proof(page, _slot_cookies: list[dict], ca
         return "ok"
     if browser_device_state in {"cf_blocked", "rate_limited"}:
         return browser_device_state
+    if browser_device_state == "unknown":
+        return "ok"
 
     return "proof_failed"
 

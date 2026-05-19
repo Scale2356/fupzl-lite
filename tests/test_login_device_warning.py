@@ -102,3 +102,25 @@ def test_auth_probe_success_does_not_require_active_linux_device():
     }
 
     assert _is_auth_probe_success(browser_probe) is True
+
+
+@pytest.mark.asyncio
+async def test_login_proof_accepts_security_page_when_device_proof_is_inconclusive(monkeypatch):
+    from litefupzl.oneshot import session
+
+    async def fake_extract_username(_page):
+        return "redacted-user"
+
+    async def fake_probe_security(_page, _username):
+        return "ok"
+
+    async def fake_probe_device(_page, _username):
+        return "unknown"
+
+    monkeypatch.setattr(session, "_extract_username", fake_extract_username)
+    monkeypatch.setattr(session, "_probe_security_preferences_via_browser", fake_probe_security)
+    monkeypatch.setattr(session, "_probe_security_preferences_device_list_via_browser", fake_probe_device)
+
+    state = await session._require_authenticated_login_proof(object(), [{"name": "_t", "value": "redacted"}], "ok")
+
+    assert state == "ok"
