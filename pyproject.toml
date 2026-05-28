@@ -1,7 +1,7 @@
 [project]
 name = "litefupzl"
 version = "0.1.0"
-description = "Read-only lightweight browser oneshot and probe runner"
+description = "Lightweight browser oneshot and probe runner"
 requires-python = ">=3.13"
 dependencies = [
     "playwright>=1.50.0",

@@ -1,4 +1,4 @@
-"""Default values for litefupzl read-only oneshot mode."""
+"""Default values for litefupzl oneshot mode."""
 
 SESSION_DURATION_MINUTES = 40
 FINGERPRINT_VIEWPORT = [1920, 1080]

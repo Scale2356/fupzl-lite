@@ -11,7 +11,7 @@ from litefupzl.config.defaults import FINGERPRINT_LOCALE, FINGERPRINT_TIMEZONE, 
 
 
 class OneShotEnvConfig(BaseModel):
-    """Validated read-only oneshot configuration loaded from environment variables."""
+    """Validated oneshot configuration loaded from environment variables."""
 
     site: Literal["linux.do"] = "linux.do"
     cookies: list[str] = Field(..., min_length=1)
@@ -22,6 +22,7 @@ class OneShotEnvConfig(BaseModel):
     proxy_server: str | None = None
     virtual_display: bool = True
     cookie_refresh_enabled: bool = False
+    mutual_like_users: list[str] = Field(default_factory=list)
     fingerprint: FingerprintConfig = Field(
         default_factory=lambda: FingerprintConfig(
             viewport=list(FINGERPRINT_VIEWPORT),
@@ -36,4 +37,20 @@ class OneShotEnvConfig(BaseModel):
         cleaned = [value.strip() for value in values if value and value.strip()]
         if not cleaned:
             raise ValueError("list must contain at least one non-empty item")
+        return cleaned
+
+    @field_validator("mutual_like_users")
+    @classmethod
+    def validate_mutual_like_users(cls, values: list[str]) -> list[str]:
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            username = str(value).strip()
+            if not username:
+                continue
+            key = username.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(username)
         return cleaned

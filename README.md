@@ -1,16 +1,18 @@
 # litefupzl
 
-`litefupzl` is a lightweight, read-only browser runner for checking that a
+`litefupzl` is a lightweight browser runner for checking that a
 cookie-authenticated forum session can log in, pass browser challenges, and
 perform human-like read activity.
 
-It does not like posts, reply, create topics, or send write-action requests.
+It does not reply, create topics, or run lottery actions. The only optional
+write action is the bounded mutual-like pass described below.
 
 ## Features
 
 - Browser challenge prewarm and challenge handling before authenticated work.
 - Cookie login proof with authenticated browser-session checks.
 - Read-only topic browsing with human-like scrolling and retry behavior.
+- Optional mutual-like pass for configured usernames.
 - Per-browser `/topics/timings` status diagnostics in redacted logs.
 - Optional cookie refresh with validation before writing a GitHub secret.
 - Manual and scheduled runs share the same cookie-refresh switch.
@@ -35,9 +37,10 @@ LITEFUPZL_PROXY_SERVER=
 LITEFUPZL_VIRTUAL_DISPLAY=true
 LITEFUPZL_OUTPUT_DIR=output/litefupzl
 LITEFUPZL_COOKIE_REFRESH_ENABLED=true
+LITEFUPZL_MUTUAL_LIKE_USERS_JSON=[]
 ```
 
-Run the main read-only job:
+Run the main job:
 
 ```powershell
 python apps/litefupzl/main.py
@@ -73,7 +76,7 @@ array:
 Use only the durable login cookie. Do not add short-lived browser/session
 cookies such as `_forum_session` or `cf_clearance`.
 
-The main read-only run processes cookie slots sequentially. Each array item is
+The main run processes cookie slots sequentially. Each array item is
 assigned a public slot alias such as `slot-001`, `slot-002`, and so on. Probe
 commands are quick diagnostics and currently use only the first cookie slot.
 
@@ -117,6 +120,36 @@ Recommended permissions:
 
 Do not place this token in code, commits, logs, or artifacts.
 
+#### `LITEFUPZL_MUTUAL_LIKE_USERS_JSON`
+
+Optional. A JSON array of usernames for the bounded mutual-like pass.
+
+Example:
+
+```json
+["user_a", "user_b", "user_c"]
+```
+
+Missing, empty, malformed, or `[]` disables mutual-like entirely.
+
+When enabled, each cookie slot independently:
+
+1. waits until roughly half of that slot's read duration has elapsed;
+2. fetches each target user's recent replies and topic first posts from the
+   last 30 days;
+3. processes candidates from oldest to newest;
+4. skips content that is already liked, not likeable, or belongs to the
+   current account;
+5. sends at most 25 likes total for that slot.
+
+The per-target quota is `floor(25 / username_count)`. For example, three
+target usernames allow at most eight likes per target in one slot. If more than
+25 usernames are configured, the per-target quota is zero and the pass is
+skipped for that slot.
+
+Store this value as a repository secret when possible, because usernames are
+treated as sensitive operational data.
+
 ### Repository variables
 
 #### `LITEFUPZL_SITE`
@@ -129,7 +162,7 @@ Default read duration per cookie slot when the manual input is empty. Default:
 `40`.
 
 Slots run sequentially, not in parallel. For example, if this is `40` and
-`LITEFUPZL_COOKIES_JSON` contains two accounts, the main read-only work can run
+`LITEFUPZL_COOKIES_JSON` contains two accounts, the main work can run
 for about `40 + 40 = 80` minutes, plus setup, login verification, probes, and
 cleanup overhead. Keep the workflow timeout in mind when adding more accounts.
 
@@ -195,7 +228,7 @@ workflow input for that single run.
 
 ## Manual workflow inputs
 
-### Main read-only run
+### Main run
 
 #### `duration_minutes`
 
@@ -250,6 +283,12 @@ Console logs are intentionally coarse-grained and designed to be public-safe:
 Login verification is shown as a single `login-check` step in console logs.
 Detailed login proof events are written only to local output files, which are
 uploaded by GitHub Actions only when a manual run sets `upload_artifacts=true`.
+
+Mutual-like console logs show only aggregate state: enabled or skipped, target
+count, and total liked count. They do not show usernames, post ids, topic ids,
+titles, URLs, or concrete like targets. Per-candidate mutual-like debug records
+use aliases such as `target-001` and `candidate-0001` and are written to local
+output files only.
 
 For each observed `/topics/timings` request, diagnostics include:
 

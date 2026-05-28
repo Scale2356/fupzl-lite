@@ -1,4 +1,4 @@
-"""Per-slot execution for Phase 3 oneshot mode."""
+"""Per-slot execution for litefupzl oneshot mode."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 from playwright.async_api import async_playwright
 
+from litefupzl.actions.mutual_like import MutualLikeResult, run_mutual_like_pass
 from litefupzl.actions.read import human_like_scroll
 from litefupzl.browser.fingerprint import build_context_options
 from litefupzl.browser.navigation import handle_cf_challenge, is_cf_challenge, prime_cf_challenge, random_delay, safe_goto, safe_reload
@@ -93,7 +94,10 @@ async def run_slot_session(slot: SlotConfig, config, recorder: PublicRecorder) -
 
     temp_profile = Path(tempfile.mkdtemp(prefix=f"litefupzl-{slot.slot_alias}-"))
     pw = context = main_page = json_page = None
-    deadline = time.monotonic() + slot.duration_minutes * 60
+    slot_start = time.monotonic()
+    duration_seconds = slot.duration_minutes * 60
+    deadline = slot_start + duration_seconds
+    mutual_like_done = False
 
     try:
         pw, context, main_page, json_page = await asyncio.wait_for(
@@ -326,6 +330,24 @@ async def run_slot_session(slot: SlotConfig, config, recorder: PublicRecorder) -
             except Exception:
                 read_warning_seen = True
                 last_read_failure_code = "READ_FAILED_SCROLL_EXCEPTION"
+
+            if _should_run_mutual_like_pass(
+                mutual_like_done=mutual_like_done,
+                mutual_like_enabled=bool(getattr(config, "mutual_like_users", [])),
+                slot_start=slot_start,
+                duration_seconds=duration_seconds,
+                now=time.monotonic(),
+            ):
+                mutual_like_done = True
+                await _run_midpoint_mutual_like_pass(
+                    slot_cookies=slot_cookies,
+                    config=config,
+                    result=result,
+                    recorder=recorder,
+                    slot_alias=slot.slot_alias,
+                    actor_username=username,
+                    user_agent=browser_user_agent,
+                )
 
         if read_warning_seen and not result.read_ok:
             result.warning_codes.append(WarningCode.READ_FAILED.value)
@@ -1425,6 +1447,85 @@ async def _build_topic_queue(slot_cookies: list[dict], config, *, user_agent: st
 def _latest_page_count_for_duration(duration_minutes: int) -> int:
     """Map a slot duration to the number of latest.json pages to inspect."""
     return max(1, (int(duration_minutes) + 4) // 5)
+
+
+def _should_run_mutual_like_pass(
+    *,
+    mutual_like_done: bool,
+    mutual_like_enabled: bool,
+    slot_start: float,
+    duration_seconds: float,
+    now: float,
+) -> bool:
+    """Return whether the once-per-slot mutual-like pass should run now."""
+    if mutual_like_done or not mutual_like_enabled:
+        return False
+    return now >= slot_start + (duration_seconds / 2)
+
+
+async def _run_midpoint_mutual_like_pass(
+    *,
+    slot_cookies: list[dict],
+    config,
+    result: SlotResult,
+    recorder: PublicRecorder,
+    slot_alias: str,
+    actor_username: str | None,
+    user_agent: str | None = None,
+) -> MutualLikeResult:
+    """Run the opt-in mutual-like pass and record only redacted events."""
+    like_result = await asyncio.to_thread(
+        run_mutual_like_pass,
+        slot_cookies,
+        _BASE_URL,
+        list(getattr(config, "mutual_like_users", []) or []),
+        actor_username=actor_username,
+        recorder=recorder,
+        slot_alias=slot_alias,
+        user_agent=user_agent,
+    )
+
+    result.mutual_like_enabled = like_result.enabled
+    result.mutual_like_target_count = like_result.target_count
+    result.mutual_like_liked_count = like_result.liked_count
+
+    for artifact in like_result.artifacts:
+        if hasattr(recorder, "record_mutual_like_artifact"):
+            recorder.record_mutual_like_artifact(artifact)
+        recorder.emit(
+            slot_alias,
+            "mutual-like-detail",
+            str(artifact.get("phase") or "observed"),
+            code=str(artifact.get("skip_reason") or "OK"),
+            status_code=artifact.get("status_code"),
+            public=False,
+        )
+
+    if like_result.warning_code:
+        if like_result.warning_code not in result.warning_codes:
+            result.warning_codes.append(like_result.warning_code)
+        recorder.emit(
+            slot_alias,
+            "mutual-like",
+            "warning",
+            level="warning",
+            code=f"enabled={str(like_result.enabled).lower()} target_count={like_result.target_count} liked={like_result.liked_count}",
+        )
+    elif not like_result.enabled or like_result.quota_per_target <= 0:
+        recorder.emit(
+            slot_alias,
+            "mutual-like",
+            "skipped",
+            code=f"enabled={str(like_result.enabled).lower()} target_count={like_result.target_count} liked={like_result.liked_count}",
+        )
+    else:
+        recorder.emit(
+            slot_alias,
+            "mutual-like",
+            "ok",
+            code=f"enabled=true target_count={like_result.target_count} liked={like_result.liked_count}",
+        )
+    return like_result
 
 
 def _finish_result(result: SlotResult) -> SlotResult:

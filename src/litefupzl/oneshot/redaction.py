@@ -1,4 +1,4 @@
-"""Redaction helpers for public Phase 3 logs and artifacts."""
+"""Redaction helpers for public litefupzl logs and artifacts."""
 
 from __future__ import annotations
 

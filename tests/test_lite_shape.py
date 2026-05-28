@@ -22,18 +22,13 @@ def test_lite_repo_shape_excludes_old_surfaces():
     assert (SRC / "oneshot" / "session.py").exists()
 
 
-def test_runtime_source_has_no_write_action_path():
+def test_runtime_source_has_no_lottery_or_reply_write_path():
     assert SRC.exists()
     forbidden_markers = [
-        "/post_actions",
-        "post_actions",
         "create_reply",
         "reply_lottery",
         "maybe_reply_lottery",
         "get_lottery_topics",
-        "find_likeable_post",
-        "like_post_via_post_actions",
-        "post_action_type_id",
     ]
     hits = []
     for path in SRC.rglob("*.py"):
@@ -41,6 +36,20 @@ def test_runtime_source_has_no_write_action_path():
         for marker in forbidden_markers:
             if marker in text:
                 hits.append(f"{path.relative_to(ROOT)}:{marker}")
+    assert hits == []
+
+
+def test_only_mutual_like_module_uses_post_actions_write_path():
+    allowed = {
+        SRC / "actions" / "mutual_like.py",
+        SRC / "discourse" / "http_bypass.py",
+    }
+    hits = []
+    for path in SRC.rglob("*.py"):
+        text = path.read_text(encoding="utf-8")
+        if any(marker in text for marker in ["/post_actions", "post_action_type_id", "like_post_via_post_actions"]):
+            if path not in allowed:
+                hits.append(str(path.relative_to(ROOT)))
     assert hits == []
 
 

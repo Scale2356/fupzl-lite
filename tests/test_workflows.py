@@ -39,8 +39,10 @@ def test_oneshot_workflow_removed_write_action_env_and_schedule_uses_refresh_var
     inputs = workflow[True]["workflow_dispatch"]["inputs"]
     assert inputs["cookie_refresh_enabled"]["default"] == "true"
     env = workflow["jobs"]["oneshot"]["env"]
-    forbidden_env = [key for key in env if "LIKE" in key or "LOTTERY" in key]
+    forbidden_env = [key for key in env if "LOTTERY" in key]
     assert forbidden_env == []
+    assert "LITEFUPZL_MUTUAL_LIKE_USERS_JSON" in env
+    assert "secrets.LITEFUPZL_MUTUAL_LIKE_USERS_JSON" in env["LITEFUPZL_MUTUAL_LIKE_USERS_JSON"]
     refresh_expr = env["LITEFUPZL_COOKIE_REFRESH_ENABLED"]
     assert "github.event_name == 'workflow_dispatch'" in refresh_expr
     assert "inputs.cookie_refresh_enabled" in refresh_expr

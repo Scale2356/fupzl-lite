@@ -54,6 +54,26 @@ def _load_json_array(primary_key: str, alias_keys: tuple[str, ...] = (), default
     raise ValueError(f"Missing required environment variable: {primary_key}")
 
 
+def _load_optional_json_array(primary_key: str, alias_keys: tuple[str, ...] = ()) -> list[str]:
+    """Load an optional JSON string array, returning [] when absent or malformed.
+
+    Mutual-like is intentionally opt-in and fail-closed: a malformed target list
+    disables the feature instead of failing the read flow.
+    """
+    for key in (primary_key, *alias_keys):
+        raw = os.environ.get(key)
+        if not raw:
+            continue
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(parsed, list):
+            return []
+        return [str(item) for item in parsed]
+    return []
+
+
 def _load_int(primary_key: str, default: int, alias_keys: tuple[str, ...] = ()) -> int:
     for key in (primary_key, *alias_keys):
         raw = os.environ.get(key)
@@ -81,7 +101,7 @@ def _cookie_refresh_enabled_from_env() -> bool:
 
 
 def load_oneshot_env() -> OneShotEnvConfig:
-    """Load read-only oneshot config from environment variables only."""
+    """Load oneshot config from environment variables only."""
     _load_repo_env_files()
 
     config = {
@@ -98,5 +118,6 @@ def load_oneshot_env() -> OneShotEnvConfig:
         "proxy_server": os.environ.get("LITEFUPZL_PROXY_SERVER") or os.environ.get("FUCKPZL_ONESHOT_PROXY_SERVER") or None,
         "virtual_display": _load_bool("LITEFUPZL_VIRTUAL_DISPLAY", True, alias_keys=("FUCKPZL_ONESHOT_VIRTUAL_DISPLAY",)),
         "cookie_refresh_enabled": _cookie_refresh_enabled_from_env(),
+        "mutual_like_users": _load_optional_json_array("LITEFUPZL_MUTUAL_LIKE_USERS_JSON"),
     }
     return OneShotEnvConfig.model_validate(config)

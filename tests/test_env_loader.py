@@ -81,3 +81,36 @@ def test_legacy_cookie_env_alias_is_still_supported(monkeypatch):
     config = load_oneshot_env()
 
     assert config.cookies == ["_t=legacy-redacted"]
+
+
+def test_mutual_like_users_default_to_empty_when_unset(monkeypatch):
+    from litefupzl.oneshot.env_loader import load_oneshot_env
+
+    monkeypatch.setenv("LITEFUPZL_COOKIES_JSON", json.dumps(["_t=redacted"]))
+    monkeypatch.delenv("LITEFUPZL_MUTUAL_LIKE_USERS_JSON", raising=False)
+
+    config = load_oneshot_env()
+
+    assert config.mutual_like_users == []
+
+
+def test_mutual_like_users_are_deduped_and_blank_values_removed(monkeypatch):
+    from litefupzl.oneshot.env_loader import load_oneshot_env
+
+    monkeypatch.setenv("LITEFUPZL_COOKIES_JSON", json.dumps(["_t=redacted"]))
+    monkeypatch.setenv("LITEFUPZL_MUTUAL_LIKE_USERS_JSON", json.dumps([" alice ", "", "bob", "alice"]))
+
+    config = load_oneshot_env()
+
+    assert config.mutual_like_users == ["alice", "bob"]
+
+
+def test_mutual_like_users_malformed_json_skips_feature(monkeypatch):
+    from litefupzl.oneshot.env_loader import load_oneshot_env
+
+    monkeypatch.setenv("LITEFUPZL_COOKIES_JSON", json.dumps(["_t=redacted"]))
+    monkeypatch.setenv("LITEFUPZL_MUTUAL_LIKE_USERS_JSON", "not-json")
+
+    config = load_oneshot_env()
+
+    assert config.mutual_like_users == []

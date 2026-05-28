@@ -48,6 +48,7 @@ class PublicRecorder:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.timeline: list[SlotEvent] = []
+        self.mutual_like_artifacts: list[dict] = []
 
     def emit(
         self,
@@ -99,10 +100,29 @@ class PublicRecorder:
         )
         getattr(safe_logger, level)(redact_text(" ".join(parts).strip()))
 
+    def record_mutual_like_artifact(self, event: dict) -> None:
+        """Record a redacted per-candidate mutual-like debug event."""
+        allowed = {
+            "ts",
+            "slot",
+            "target_alias",
+            "candidate_alias",
+            "kind",
+            "phase",
+            "status_code",
+            "skip_reason",
+            "already_liked",
+            "rate_limited",
+            "stopped",
+        }
+        safe_event = {key: value for key, value in event.items() if key in allowed}
+        self.mutual_like_artifacts.append(safe_event)
+
     def write_artifacts(self, run_result: RunResult) -> tuple[Path, Path]:
         """Write public timeline and summary artifacts."""
         timeline_path = self.output_dir / "oneshot_timeline.jsonl"
         summary_path = self.output_dir / "oneshot_summary.json"
+        mutual_like_path = self.output_dir / "mutual_like_artifacts.jsonl"
 
         timeline_path.write_text(
             "\n".join(json.dumps(asdict(event), ensure_ascii=False) for event in self.timeline) + ("\n" if self.timeline else ""),
@@ -110,6 +130,11 @@ class PublicRecorder:
         )
         summary_path.write_text(
             json.dumps(run_result.to_summary_dict(), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        mutual_like_path.write_text(
+            "\n".join(json.dumps(event, ensure_ascii=False) for event in self.mutual_like_artifacts)
+            + ("\n" if self.mutual_like_artifacts else ""),
             encoding="utf-8",
         )
         return timeline_path, summary_path

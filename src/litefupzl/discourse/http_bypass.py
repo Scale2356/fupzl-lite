@@ -1,16 +1,13 @@
-"""HTTP fallbacks for Cloudflare-sensitive Linux.do read/auth endpoints.
-
-The module intentionally contains only read/authenticated GET helpers. It does
-not implement Discourse write endpoints such as reactions or replies.
-"""
+"""HTTP fallbacks for Cloudflare-sensitive Linux.do endpoints."""
 
 from __future__ import annotations
 
 import html as html_lib
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from curl_cffi import requests
 
@@ -19,8 +16,23 @@ from litefupzl.discourse.models import Topic, UserInfo
 _IMPERSONATE = "firefox135"
 _SESSION_CURRENT_JSON_URL = "https://linux.do/session/current.json"
 _NOTIFICATIONS_JSON_URL = "https://linux.do/notifications.json?recent=true&limit=1"
+_CSRF_URL = "https://linux.do/session/csrf"
+_POST_ACTIONS_URL = "https://linux.do/post_actions"
 _JSON_ACCEPT = "application/json, text/javascript, */*; q=0.01"
 _HTML_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+_ALREADY_ACTED_MARKERS = (
+    "已经执行了此操作",
+    "already performed this action",
+    "already taken this action",
+)
+
+
+@dataclass(frozen=True)
+class PostActionResult:
+    ok: bool
+    already_acted: bool
+    status_code: int
+    detail: str = ""
 
 
 def _clean_user_agent(user_agent: str | None) -> str | None:
@@ -114,6 +126,81 @@ def _build_session(
             path=cookie.get("path") or "/",
         )
     return session
+
+
+def _extract_error_text(body: str) -> str:
+    try:
+        payload = json.loads(body)
+    except json.JSONDecodeError:
+        return body
+    if isinstance(payload, dict):
+        errors = payload.get("errors")
+        if isinstance(errors, list):
+            return " ".join(str(item) for item in errors)
+    return body
+
+
+def _get_csrf_token(session: requests.Session) -> str | None:
+    response = session.get(
+        _CSRF_URL,
+        impersonate=_IMPERSONATE,
+        timeout=20,
+        headers={
+            **session.headers,
+            "X-Requested-With": "XMLHttpRequest",
+        },
+    )
+    if response.status_code != 200:
+        return None
+    try:
+        return response.json().get("csrf")
+    except ValueError:
+        return None
+
+
+def like_post_via_post_actions(
+    cookies: list[dict],
+    post_id: int,
+    *,
+    topic_url: str,
+    user_agent: str | None = None,
+) -> PostActionResult:
+    """Submit a standard Discourse like request via /post_actions."""
+    session = _build_session(
+        cookies,
+        accept=_JSON_ACCEPT,
+        referer=topic_url,
+        user_agent=user_agent,
+    )
+    csrf_token = _get_csrf_token(session)
+    if not csrf_token:
+        return PostActionResult(ok=False, already_acted=False, status_code=403, detail="csrf unavailable")
+
+    response = session.post(
+        _POST_ACTIONS_URL,
+        impersonate=_IMPERSONATE,
+        timeout=20,
+        data={
+            "id": post_id,
+            "post_action_type_id": 2,
+            "flag_topic": "false",
+        },
+        headers={
+            **session.headers,
+            "X-CSRF-Token": csrf_token,
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        },
+    )
+    detail = response.text[:500]
+    if response.status_code == 200:
+        return PostActionResult(ok=True, already_acted=False, status_code=200, detail=detail)
+
+    error_text = _extract_error_text(detail)
+    if response.status_code == 403 and any(marker in error_text for marker in _ALREADY_ACTED_MARKERS):
+        return PostActionResult(ok=True, already_acted=True, status_code=403, detail=error_text)
+
+    return PostActionResult(ok=False, already_acted=False, status_code=response.status_code, detail=error_text)
 
 
 def fetch_json(cookies: list[dict], url: str, *, referer: str | None = None, user_agent: str | None = None) -> dict:
@@ -334,3 +421,40 @@ def get_latest_topics_pages_via_http(
             topics.append(topic)
 
     return topics
+
+
+def fetch_user_actions_via_http(
+    cookies: list[dict],
+    base_url: str,
+    username: str,
+    *,
+    action_filter: str,
+    offset: int = 0,
+    user_agent: str | None = None,
+) -> list[dict]:
+    """Fetch one page of a user's Discourse action feed."""
+    query = urlencode(
+        {
+            "offset": str(offset),
+            "username": username,
+            "filter": str(action_filter),
+        }
+    )
+    data = fetch_json(cookies, f"{base_url}/user_actions.json?{query}", referer=base_url, user_agent=user_agent)
+    actions = data.get("user_actions", [])
+    return actions if isinstance(actions, list) else []
+
+
+def get_topic_detail_via_http(
+    cookies: list[dict],
+    base_url: str,
+    topic_id: int,
+    *,
+    slug: str = "topic",
+    user_agent: str | None = None,
+) -> dict:
+    """Fetch topic detail JSON via curl_cffi."""
+    topic_slug = slug or "topic"
+    url = f"{base_url}/t/{quote(topic_slug, safe='')}/{topic_id}.json"
+    referer = f"{base_url}/t/{quote(topic_slug, safe='')}/{topic_id}"
+    return fetch_json(cookies, url, referer=referer, user_agent=user_agent)

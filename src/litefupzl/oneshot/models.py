@@ -1,4 +1,4 @@
-"""Runtime models for litefupzl read-only oneshot mode."""
+"""Runtime models for litefupzl oneshot mode."""
 
 from __future__ import annotations
 
@@ -23,6 +23,8 @@ class WarningCode(StrEnum):
     TOPIC_FETCH_FAILED = "TOPIC_FETCH_FAILED"
     COOKIE_REFRESH_FAILED = "COOKIE_REFRESH_FAILED"
     LOGIN_DEVICE_PROOF_INCONCLUSIVE = "LOGIN_DEVICE_PROOF_INCONCLUSIVE"
+    MUTUAL_LIKE_WARNING = "MUTUAL_LIKE_WARNING"
+    MUTUAL_LIKE_RATE_LIMITED = "MUTUAL_LIKE_RATE_LIMITED"
     RUNTIME_WARNING = "RUNTIME_WARNING"
 
 
@@ -65,6 +67,9 @@ class SlotResult:
     browser_user_agent_windows_like: bool = False
     read_ok: bool = False
     read_same_context_ok: bool = False
+    mutual_like_enabled: bool = False
+    mutual_like_target_count: int = 0
+    mutual_like_liked_count: int = 0
     cookie_refresh_ok: bool = False
     cf_seen: bool = False
     warning_codes: list[str] = field(default_factory=list)
