@@ -82,7 +82,7 @@ commands are quick diagnostics and currently use only the first cookie slot.
 
 ## GitHub Actions setup
 
-Configure these repository secrets and variables under:
+Configure GitHub Actions configuration as repository secrets under:
 
 `Settings` → `Secrets and variables` → `Actions`
 
@@ -147,10 +147,10 @@ target usernames allow at most eight likes per target in one slot. If more than
 25 usernames are configured, the per-target quota is zero and the pass is
 skipped for that slot.
 
-Store this value as a repository secret when possible, because usernames are
-treated as sensitive operational data.
+Usernames are treated as sensitive operational data, so this value is read only
+from repository secrets in GitHub Actions.
 
-### Repository variables
+### Additional repository secrets
 
 #### `LITEFUPZL_SITE`
 
@@ -214,17 +214,18 @@ Maximum challenge handling time for the challenge probe. Default: `120`.
 
 Number of recent workflow runs to keep during cleanup. Default: `15`.
 
-### Local/runtime variable
-
 #### `LITEFUPZL_COOKIE_REFRESH_ENABLED`
 
 Cookie refresh switch for local runs and scheduled GitHub Actions runs. Default:
 `true`.
 
-For scheduled GitHub Actions runs, set repository variable
+For scheduled GitHub Actions runs, set repository secret
 `LITEFUPZL_COOKIE_REFRESH_ENABLED=false` only if you want to disable automatic
 validated cookie write-back. Manual runs use the `cookie_refresh_enabled`
 workflow input for that single run.
+
+For local runs, use the same names as environment variables or put them in
+`.env.local`.
 
 ## Manual workflow inputs
 
@@ -240,7 +241,7 @@ Optional manual runtime override. Leave empty to use
 Default: `true`. Set to `false` only for a manual run where refreshed cookies
 should not be written back to `LITEFUPZL_COOKIES_JSON`.
 
-Scheduled runs do not read this manual input. They use repository variable
+Scheduled runs do not read this manual input. They use repository secret
 `LITEFUPZL_COOKIE_REFRESH_ENABLED` instead.
 
 #### `cookie_refresh_probe`
@@ -303,7 +304,7 @@ For each observed `/topics/timings` request, diagnostics include:
 Cookie refresh is enabled by default.
 
 Manual runs use the `cookie_refresh_enabled` workflow input. Scheduled runs use
-repository variable `LITEFUPZL_COOKIE_REFRESH_ENABLED`.
+repository secret `LITEFUPZL_COOKIE_REFRESH_ENABLED`.
 
 When enabled, the runner:
 

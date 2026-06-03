@@ -9,6 +9,14 @@ def load_workflow(name: str) -> dict:
     return yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"))
 
 
+def test_workflows_use_secrets_not_repository_variables_for_configuration():
+    for filename in ("oneshot.yml", "probes.yml"):
+        raw = (ROOT / ".github" / "workflows" / filename).read_text(encoding="utf-8")
+        assert "vars." not in raw
+        assert "secrets.LITEFUPZL_COOKIES_JSON" in raw
+        assert "secrets.LITEFUPZL_ACTIONS_ADMIN_TOKEN" in raw
+
+
 def _steps(workflow: dict, job: str) -> list[dict]:
     return workflow["jobs"][job]["steps"]
 
@@ -34,7 +42,7 @@ def test_artifacts_upload_is_manual_opt_in_for_both_workflows():
         assert "output/phase3" not in upload["with"]["path"]
 
 
-def test_oneshot_workflow_removed_write_action_env_and_schedule_uses_refresh_variable():
+def test_oneshot_workflow_removed_write_action_env_and_schedule_uses_refresh_secret():
     workflow = load_workflow("oneshot.yml")
     inputs = workflow[True]["workflow_dispatch"]["inputs"]
     assert inputs["cookie_refresh_enabled"]["default"] == "true"
@@ -43,11 +51,16 @@ def test_oneshot_workflow_removed_write_action_env_and_schedule_uses_refresh_var
     assert forbidden_env == []
     assert "LITEFUPZL_MUTUAL_LIKE_USERS_JSON" in env
     assert "secrets.LITEFUPZL_MUTUAL_LIKE_USERS_JSON" in env["LITEFUPZL_MUTUAL_LIKE_USERS_JSON"]
+    joined_env = "\n".join(str(value) for value in env.values())
+    assert "vars." not in joined_env
+    assert "secrets.LITEFUPZL_DURATION_MINUTES" in env["LITEFUPZL_DURATION_MINUTES"]
+    assert "secrets.FUCKPZL_ONESHOT_DURATION_MINUTES" in env["LITEFUPZL_DURATION_MINUTES"]
     refresh_expr = env["LITEFUPZL_COOKIE_REFRESH_ENABLED"]
     assert "github.event_name == 'workflow_dispatch'" in refresh_expr
     assert "inputs.cookie_refresh_enabled" in refresh_expr
-    assert "vars.LITEFUPZL_COOKIE_REFRESH_ENABLED" in refresh_expr
-    assert "vars.FUCKPZL_ONESHOT_COOKIE_REFRESH_ENABLED" in refresh_expr
+    assert "secrets.LITEFUPZL_COOKIE_REFRESH_ENABLED" in refresh_expr
+    assert "secrets.FUCKPZL_ONESHOT_COOKIE_REFRESH_ENABLED" in refresh_expr
+    assert "vars." not in refresh_expr
     assert "|| 'true'" in refresh_expr
     assert "inputs.cookie_refresh_enabled == 'true' && 'true' || 'false'" not in refresh_expr
 
@@ -62,7 +75,8 @@ def test_cleanup_old_workflow_runs_keeps_pagination_and_retention():
     for filename, job in [("oneshot.yml", "oneshot"), ("probes.yml", "probe")]:
         workflow = load_workflow(filename)
         cleanup = _step(workflow, job, "Cleanup old workflow runs")
-        assert cleanup["env"]["ACTIONS_RUNS_KEEP"] == "${{ vars.LITEFUPZL_ACTIONS_RUNS_KEEP || vars.FUCKPZL_ACTIONS_RUNS_KEEP || '15' }}"
+        assert cleanup["env"]["ACTIONS_RUNS_KEEP"] == "${{ secrets.LITEFUPZL_ACTIONS_RUNS_KEEP || secrets.FUCKPZL_ACTIONS_RUNS_KEEP || '15' }}"
+        assert "vars." not in cleanup["env"]["ACTIONS_RUNS_KEEP"]
         script = cleanup["run"]
         assert "per_page" in script and "100" in script
         assert "page += 1" in script

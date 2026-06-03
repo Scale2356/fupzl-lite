@@ -32,17 +32,17 @@ jobs:
       contents: read
       actions: write
     env:
-      LITEFUPZL_SITE: ${{ vars.LITEFUPZL_SITE || 'linux.do' }}
+      LITEFUPZL_SITE: ${{ secrets.LITEFUPZL_SITE || secrets.FUCKPZL_ONESHOT_SITE || 'linux.do' }}
       LITEFUPZL_COOKIES_JSON: ${{ secrets.LITEFUPZL_COOKIES_JSON || secrets.FUCKPZL_ONESHOT_COOKIES_JSON }}
       LITEFUPZL_ACTIONS_ADMIN_TOKEN: ${{ secrets.LITEFUPZL_ACTIONS_ADMIN_TOKEN || secrets.FUCKPZL_ACTIONS_ADMIN_TOKEN }}
-      LITEFUPZL_DURATION_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.duration_minutes || vars.LITEFUPZL_DURATION_MINUTES || vars.FUCKPZL_ONESHOT_DURATION_MINUTES || '40' }}
-      LITEFUPZL_HEADLESS: ${{ vars.LITEFUPZL_HEADLESS || vars.FUCKPZL_ONESHOT_HEADLESS || 'false' }}
-      LITEFUPZL_OUTPUT_DIR: ${{ vars.LITEFUPZL_OUTPUT_DIR || vars.FUCKPZL_ONESHOT_OUTPUT_DIR || 'output/litefupzl' }}
-      LITEFUPZL_BROWSER: ${{ vars.LITEFUPZL_BROWSER || vars.FUCKPZL_ONESHOT_BROWSER || 'chromium' }}
-      LITEFUPZL_PROXY_SERVER: ${{ vars.LITEFUPZL_PROXY_SERVER || vars.FUCKPZL_ONESHOT_PROXY_SERVER || 'http://127.0.0.1:1080' }}
-      LITEFUPZL_VIRTUAL_DISPLAY: ${{ vars.LITEFUPZL_VIRTUAL_DISPLAY || vars.FUCKPZL_ONESHOT_VIRTUAL_DISPLAY || 'true' }}
-      LITEFUPZL_COOKIE_REFRESH_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.cookie_refresh_enabled || vars.LITEFUPZL_COOKIE_REFRESH_ENABLED || vars.FUCKPZL_ONESHOT_COOKIE_REFRESH_ENABLED || 'true' }}
-      LITEFUPZL_MUTUAL_LIKE_USERS_JSON: ${{ secrets.LITEFUPZL_MUTUAL_LIKE_USERS_JSON || vars.LITEFUPZL_MUTUAL_LIKE_USERS_JSON || '' }}
+      LITEFUPZL_DURATION_MINUTES: ${{ github.event_name == 'workflow_dispatch' && inputs.duration_minutes || secrets.LITEFUPZL_DURATION_MINUTES || secrets.FUCKPZL_ONESHOT_DURATION_MINUTES || '40' }}
+      LITEFUPZL_HEADLESS: ${{ secrets.LITEFUPZL_HEADLESS || secrets.FUCKPZL_ONESHOT_HEADLESS || 'false' }}
+      LITEFUPZL_OUTPUT_DIR: ${{ secrets.LITEFUPZL_OUTPUT_DIR || secrets.FUCKPZL_ONESHOT_OUTPUT_DIR || 'output/litefupzl' }}
+      LITEFUPZL_BROWSER: ${{ secrets.LITEFUPZL_BROWSER || secrets.FUCKPZL_ONESHOT_BROWSER || 'chromium' }}
+      LITEFUPZL_PROXY_SERVER: ${{ secrets.LITEFUPZL_PROXY_SERVER || secrets.FUCKPZL_ONESHOT_PROXY_SERVER || 'http://127.0.0.1:1080' }}
+      LITEFUPZL_VIRTUAL_DISPLAY: ${{ secrets.LITEFUPZL_VIRTUAL_DISPLAY || secrets.FUCKPZL_ONESHOT_VIRTUAL_DISPLAY || 'true' }}
+      LITEFUPZL_COOKIE_REFRESH_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.cookie_refresh_enabled || secrets.LITEFUPZL_COOKIE_REFRESH_ENABLED || secrets.FUCKPZL_ONESHOT_COOKIE_REFRESH_ENABLED || 'true' }}
+      LITEFUPZL_MUTUAL_LIKE_USERS_JSON: ${{ secrets.LITEFUPZL_MUTUAL_LIKE_USERS_JSON || '' }}
       LITEFUPZL_COOKIE_REFRESH_PROBE_SECRET: LITEFUPZL_COOKIE_REFRESH_PROBE
 
     steps:
@@ -142,7 +142,7 @@ jobs:
         if: always()
         env:
           ACTIONS_CLEANUP_TOKEN: ${{ secrets.LITEFUPZL_ACTIONS_ADMIN_TOKEN || secrets.FUCKPZL_ACTIONS_ADMIN_TOKEN || github.token }}
-          ACTIONS_RUNS_KEEP: ${{ vars.LITEFUPZL_ACTIONS_RUNS_KEEP || vars.FUCKPZL_ACTIONS_RUNS_KEEP || '15' }}
+          ACTIONS_RUNS_KEEP: ${{ secrets.LITEFUPZL_ACTIONS_RUNS_KEEP || secrets.FUCKPZL_ACTIONS_RUNS_KEEP || '15' }}
         run: |
           python - <<'PY'
           import json
